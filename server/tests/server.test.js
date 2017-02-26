@@ -10,7 +10,9 @@ const todos = [{
     text: "first todo"
 }, {
     _id: new ObjectID(),
-    text: "second todo"
+    text: "second todo",
+    completed: true,
+    completedAt: 123
 }];
 
 beforeEach((done) => {
@@ -49,7 +51,7 @@ describe("POST /todos", () => {
     });
 
     it("should fail if todo is invalid", (done) => {
-        //var text = "test todos post";
+        var text = "test todos post";
 
         request(app)
             .post("/todos")
@@ -93,9 +95,8 @@ describe("GET /todos/:id", () => {
             .expect(200)
             .expect((res) => {
                 expect(res.body.todo).toExist();
-                expect(res.body.todo._id).toEqual(todos[0]._id);
+                expect(res.body.todo._id).toEqual(id);
             }).end(done);
-
     });
 
     it("should return 404 if id is invalid", (done) => {
@@ -106,7 +107,6 @@ describe("GET /todos/:id", () => {
                 expect(res.body.todo).toNotExist();
             })
             .end(done);
-
     });
 
     it("should return 404 if object is not found", (done) => {
@@ -117,6 +117,131 @@ describe("GET /todos/:id", () => {
                 expect(res.body.todo).toNotExist();
             })
             .end(done);
+    });
+});
 
+describe("DELETE /todos/:id", () => {
+
+    it("should delete todo by id", (done) => {
+        var id = todos[0]._id.toHexString();
+
+        request(app)
+            .delete("/todos/" + id)
+            .expect(200)
+            .expect((res) => {
+                expect(res.body.todo).toExist();
+                expect(res.body.todo._id).toEqual(id);
+            }).end((err, res) => {
+
+                if(err){
+                    return done(err);
+                }
+
+                Todo.findById(id).then(doc => {
+                    expect(doc).toNotExist();
+                    done();
+                }).catch(e => {
+                    done(e);
+                });
+            });
+    });
+
+    it("should return 404 if id is invalid", (done) => {
+        request(app)
+            .delete("/todos/aaa")
+            .expect(404)
+            .expect((res) => {
+                expect(res.body.todo).toNotExist();
+            })
+            .end(done);
+    });
+
+    it("should return 404 if object is not found", (done) => {
+        request(app)
+            .delete("/todos/" + new ObjectID())
+            .expect(404)
+            .expect((res) => {
+                expect(res.body.todo).toNotExist();
+            })
+            .end(done);
+    });
+});
+
+describe("PATCH /todos/:id", () => {
+
+    it("should update todo by id and set completed to true", (done) => {
+        var id = todos[0]._id.toHexString();
+
+        request(app)
+            .patch("/todos/" + id)
+            .send({completed: true})
+            .expect(200)
+            .expect((res) => {
+                expect(res.body.todo).toExist();
+                expect(res.body.todo.completed).toBeTruthy();
+                expect(res.body.todo.completedAt).toBeA("number");
+            }).end((err, res) => {
+
+                if(err){
+                    return done(err);
+                }
+
+                Todo.findById(id).then(doc => {
+                    expect(doc.completed).toBeTruthy();
+                    expect(doc.completedAt).toBeA("number");
+                    done();
+                }).catch(e => {
+                    done(e);
+                });
+            });
+    });
+
+    it("should update todo by id and set completed to false", (done) => {
+        var id = todos[1]._id.toHexString();
+
+        request(app)
+            .patch("/todos/" + id)
+            .send({completed: false})
+            .expect(200)
+            .expect((res) => {
+                expect(res.body.todo).toExist();
+                expect(res.body.todo.completed).toBeFalsy();
+                expect(res.body.todo.completedAt).toNotExist();
+            }).end((err, res) => {
+
+                if(err){
+                    return done(err);
+                }
+
+                Todo.findById(id).then(doc => {
+                    expect(doc.completed).toBeFalsy();
+                    expect(doc.completedAt).toNotExist();
+                    done();
+                }).catch(e => {
+                    done(e);
+                });
+            });
+    });
+
+    it("should return 404 if id is invalid", (done) => {
+        request(app)
+            .patch("/todos/aaa")
+            .send({completed: true})
+            .expect(404)
+            .expect((res) => {
+                expect(res.body.todo).toNotExist();
+            })
+            .end(done);
+    });
+
+    it("should return 404 if object is not found", (done) => {
+        request(app)
+            .patch("/todos/" + new ObjectID())
+            .send({completed: true})
+            .expect(404)
+            .expect((res) => {
+                expect(res.body.todo).toNotExist();
+            })
+            .end(done);
     });
 });
