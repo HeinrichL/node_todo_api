@@ -1,6 +1,7 @@
 const expect = require("expect");
 const request = require("supertest");
 const {ObjectID} = require("mongodb");
+const jwt = require("jsonwebtoken");
 
 const {app} = require("../server");
 const {Todo} = require("../models/todo");
@@ -281,7 +282,9 @@ describe("POST users", () => {
                     expect(user).toExist();
                     expect(user.password).toNotBe("123456");
                     done();
-                })
+                }).catch(e => {
+                    done(e);
+                });
             });
     });
 
@@ -303,5 +306,91 @@ describe("POST users", () => {
                 password: "123456" 
             }).expect(400)
             .end(done);
+    });
+});
+
+describe("POST /users/login", () => {
+    it("should return user and access token if credentials are correct", done => {
+        request(app)
+            .post("/users/login")
+            .send({
+                email: users[1].email, 
+                password: users[1].password 
+            }).expect(200)
+            .expect(res => {
+                expect(res.headers["x-auth"]).toBeA("string");
+                expect(res.body.email).toBe(users[1].email);
+                expect(res.body._id).toBe(users[1]._id.toHexString());
+            })
+            .end((err, res) => {
+                if (err) {
+                    return done(err);
+                }
+
+                User.findOne({
+                    email: users[1].email
+                }).then(user => {
+                    expect(user.tokens[0]).toInclude({
+                        access: "auth",
+                        token: res.headers["x-auth"]
+                    });
+                    done();
+                }).catch(e => {
+                    done(e);
+                });
+            });
+    });
+
+    it("should fail if user does not exist", done => {
+        request(app)
+            .post("/users/login")
+            .send({
+                email: "not@exist.com", 
+                password: "123456" 
+            }).expect(401)
+            .expect(res => {
+                expect(res.body).toEqual({});
+            })
+            .end((err, res) => {
+                if (err) {
+                    return done(err);
+                }
+
+                User.findOne({
+                    email: "not@exist.com"
+                }).then(user => {
+                    expect(user).toNotExist();
+                    done();
+                }).catch(e => {
+                    done(e);
+                });
+            });
+    });
+
+    it("should fail if password is wrong", done => {
+        request(app)
+            .post("/users/login")
+            .send({
+                email: users[1].email, 
+                password: "user1ss" 
+            }).expect(401)
+            .expect(res => {
+                expect(res.headers["x-auth"]).toNotExist();
+                expect(res.body).toEqual({});
+            })
+            .end((err, res) => {
+                if (err) {
+                    return done(err);
+                }
+
+                User.findOne({
+                    email: users[1].email
+                }).then(user => {
+                    expect(user.tokens.length).toBe(0);
+                    done();
+                }).catch(e => {
+                    done(e);
+                });
+            });
     });
 });
